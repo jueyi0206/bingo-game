@@ -50,46 +50,42 @@ export const checkForBingo = (board: Board): boolean => {
 
 interface BingoBoardProps {
   board: Board;
-  onCellClick?: (number: number | 'FREE') => void;
+  onCellClick?: (rowIndex: number, colIndex: number, number: number | 'FREE') => void;
   disabled?: boolean;
+  isSetup?: boolean;
+  isConcealed?: boolean;
 }
 
-export function BingoBoard({ board, onCellClick, disabled = false }: BingoBoardProps) {
-  if (!board.length || !board[0].length || board[0][0].number === 0) {
-    return (
-      <div className="grid grid-cols-5 gap-1 md:gap-2 p-1 md:p-2 bg-primary/50 rounded-lg shadow-inner w-full aspect-square">
-        {Array.from({ length: 25 }).map((_, index) => (
-          <div
-            key={index}
-            className="flex items-center justify-center aspect-square rounded-md bg-card/50"
-          >
-          </div>
-        ))}
-      </div>
-    );
-  }
-  
+export function BingoBoard({ board, onCellClick, disabled = false, isSetup = false, isConcealed = false }: BingoBoardProps) {
+  const isBoardEmpty = !board.length || !board[0].length || board.flat().every(cell => cell.number === 0);
+
   return (
     <div className="grid grid-cols-5 gap-1 md:gap-2 p-1 md:p-2 bg-primary rounded-lg shadow-lg w-full max-w-md aspect-square">
-      {board.flat().map((cell, index) => (
-        <button
-          key={index}
-          onClick={() => onCellClick && cell.number !== 'FREE' && onCellClick(cell.number)}
-          disabled={disabled || cell.marked}
-          className={cn(
-            'flex items-center justify-center aspect-square rounded-md transition-all duration-300 transform',
-            'text-lg md:text-2xl lg:text-3xl font-bold',
-            cell.marked
-              ? 'bg-accent text-accent-foreground scale-105 shadow-inner'
-              : 'bg-card text-card-foreground',
-            !cell.marked && !disabled && 'hover:bg-primary/20',
-            disabled && 'cursor-not-allowed',
-            cell.marked && disabled && 'cursor-not-allowed'
-          )}
-        >
-          {cell.number}
-        </button>
-      ))}
+      {board.flat().map((cell, index) => {
+        const rowIndex = Math.floor(index / 5);
+        const colIndex = index % 5;
+        const showNumber = !isConcealed || cell.marked;
+
+        return (
+          <button
+            key={index}
+            onClick={() => onCellClick && cell.number !== 'FREE' && onCellClick(rowIndex, colIndex, cell.number)}
+            disabled={disabled || cell.marked || (isSetup && cell.number !== 0)}
+            className={cn(
+              'flex items-center justify-center aspect-square rounded-md transition-all duration-300 transform',
+              'text-lg md:text-2xl lg:text-3xl font-bold',
+              cell.marked
+                ? 'bg-accent text-accent-foreground scale-105 shadow-inner'
+                : 'bg-card text-card-foreground',
+              isSetup && cell.number === 0 && 'bg-card/50 hover:bg-primary/20',
+              !cell.marked && !disabled && !isSetup && 'hover:bg-primary/20',
+              disabled && 'cursor-not-allowed',
+            )}
+          >
+            {isSetup ? (cell.number !== 0 ? cell.number : '') : (showNumber ? cell.number : '?')}
+          </button>
+        );
+      })}
     </div>
   );
 }

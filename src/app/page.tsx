@@ -20,6 +20,9 @@ import {
 import Confetti from 'react-dom-confetti';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
+import { Undo2 } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 type GamePhase = 'setup' | 'playing' | 'gameOver';
 
@@ -65,6 +68,25 @@ export default function Home() {
     newBoard[rowIndex][colIndex] = { number: nextSetupNumber, marked: false };
     setPlayerBoard(newBoard);
     setNextSetupNumber(prev => prev + 1);
+  };
+  
+  const handleUndoSetup = () => {
+    if (nextSetupNumber <= 1) return;
+  
+    const numberToUndo = nextSetupNumber - 1;
+    let found = false;
+    const newBoard = playerBoard.map(row => row.map(cell => {
+      if (cell.number === numberToUndo) {
+        found = true;
+        return { number: 0, marked: false };
+      }
+      return cell;
+    }));
+  
+    if (found) {
+      setPlayerBoard(newBoard);
+      setNextSetupNumber(prev => prev - 1);
+    }
   };
 
   const startGame = () => {
@@ -177,14 +199,13 @@ export default function Home() {
     );
   };
 
-
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-4 md:p-8 relative overflow-hidden bg-background text-foreground">
        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
         {isClient && <Confetti active={winner === 'Player'} config={{ spread: 90, elementCount: 200 }} />}
       </div>
 
-      <header className="text-center mb-8">
+      <header className="text-center mb-4">
         <h1 className="text-4xl md:text-5xl font-bold text-primary font-headline tracking-tight">
           AI 賓果對戰
         </h1>
@@ -194,22 +215,39 @@ export default function Home() {
           {gamePhase === 'gameOver' && (winner ? `恭喜 ${winner} 獲勝！` : '遊戲結束！')}
         </p>
       </header>
+      
+      <Card className="my-4 max-w-4xl w-full bg-card/50">
+        <CardHeader>
+            <CardTitle className="text-lg text-center">遊戲規則</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground pt-0">
+          <ol className="list-decimal list-inside space-y-1">
+            <li>在「你的棋盤」上點擊格子，依序填入 1 到 25 的數字。</li>
+            <li>填滿後，點擊「開始遊戲」。</li>
+            <li>輪到你時，點擊棋盤上任一數字。雙方棋盤上的該數字會被標記。</li>
+            <li>AI 會在你之後自動選擇一個數字。</li>
+            <li>最先在自己的棋盤上使標記的數字連成一條線（橫、豎或斜線）者獲勝。</li>
+          </ol>
+        </CardContent>
+      </Card>
+
 
       <div className="flex flex-col lg:flex-row items-start justify-center gap-8 w-full max-w-6xl">
         {/* Player Board */}
         <div className="flex flex-col items-center gap-4">
           <h2 className="text-2xl font-bold text-primary">你的棋盤</h2>
-          {gamePhase === 'setup' ? (
-            renderSetupBoard()
-          ) : (
-            <BingoBoard board={playerBoard} onCellClick={handlePlayerMove} disabled={!isPlayerTurn} />
-          )}
+          <BingoBoard 
+            board={playerBoard}
+            onCellClick={gamePhase === 'setup' ? handleSetupCellClick : handlePlayerMove}
+            disabled={gamePhase === 'playing' && !isPlayerTurn}
+            isSetup={gamePhase === 'setup'}
+          />
         </div>
 
         {/* AI Board */}
         <div className="flex flex-col items-center gap-4">
           <h2 className="text-2xl font-bold text-accent">AI 的棋盤</h2>
-          <BingoBoard board={aiBoard} disabled={true} />
+          <BingoBoard board={aiBoard} disabled={true} isConcealed={gamePhase === 'setup' || gamePhase === 'playing'} />
         </div>
       </div>
 
@@ -217,6 +255,8 @@ export default function Home() {
         gamePhase={gamePhase}
         onStartGame={startGame}
         onNewGame={startNewGame}
+        onUndo={handleUndoSetup}
+        canUndo={nextSetupNumber > 1}
       />
 
       <AlertDialog open={gamePhase === 'gameOver'} onOpenChange={(open) => !open && startNewGame()}>
