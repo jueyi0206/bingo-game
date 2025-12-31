@@ -32,7 +32,7 @@ export const generateRandomBoard = (): Board => {
 
 
 export const checkForBingo = (board: Board): boolean => {
-  if (board.length === 0 || board[0].length === 0) return false;
+  if (!board || board.length !== 5 || board[0].length !== 5) return false;
   // Check rows
   for (let i = 0; i < 5; i++) {
     if (board[i].every((cell) => cell.marked)) return true;
@@ -58,10 +58,15 @@ interface BingoBoardProps {
 
 export function BingoBoard({ board, onCellClick, disabled = false, isSetup = false, isConcealed = false }: BingoBoardProps) {
   const isBoardEmpty = !board.length || !board[0].length || board.flat().every(cell => cell.number === 0);
+  
+  const displayBoard = isBoardEmpty && isSetup
+    ? Array(5).fill(Array(5).fill({ number: 0, marked: false }))
+    : board;
+
 
   return (
     <div className="grid grid-cols-5 gap-1 md:gap-2 p-1 md:p-2 bg-primary rounded-lg shadow-lg w-full max-w-md aspect-square">
-      {board.flat().map((cell, index) => {
+      {displayBoard.flat().map((cell, index) => {
         const rowIndex = Math.floor(index / 5);
         const colIndex = index % 5;
         const showNumber = !isConcealed || cell.marked;
@@ -78,11 +83,12 @@ export function BingoBoard({ board, onCellClick, disabled = false, isSetup = fal
                 ? 'bg-accent text-accent-foreground scale-105 shadow-inner'
                 : 'bg-card text-card-foreground',
               isSetup && cell.number === 0 && 'bg-card/50 hover:bg-primary/20',
-              !cell.marked && !disabled && !isSetup && 'hover:bg-primary/20',
-              disabled && 'cursor-not-allowed',
+              !isSetup && !cell.marked && !disabled && 'hover:bg-primary/20 hover:scale-105',
+              disabled && !cell.marked && 'cursor-not-allowed',
+              isSetup && isBoardEmpty && 'h-full', // Ensure empty cells take up space
             )}
           >
-            {isSetup ? (cell.number !== 0 ? cell.number : '') : (showNumber ? cell.number : '?')}
+            {isSetup ? (cell.number !== 0 ? cell.number : <>&nbsp;</>) : (showNumber ? cell.number : '?')}
           </button>
         );
       })}

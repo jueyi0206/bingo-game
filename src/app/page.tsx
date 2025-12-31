@@ -101,7 +101,7 @@ export default function Home() {
     setGamePhase('playing');
   };
 
-  const handlePlayerMove = (number: number | 'FREE') => {
+  const handlePlayerMove = (rowIndex: number, colIndex: number, number: number | 'FREE') => {
     if (gamePhase !== 'playing' || !isPlayerTurn || typeof number !== 'number' || calledNumbers.has(number)) {
       return;
     }
@@ -110,8 +110,10 @@ export default function Home() {
     setCalledNumbers(newCalledNumbers);
     updateBoards(newCalledNumbers);
 
-    const playerWins = checkForBingo(updateBoardMarks(playerBoard, newCalledNumbers));
-    if (playerWins) {
+    const updatedPlayerBoard = updateBoardMarks(playerBoard, newCalledNumbers);
+    setPlayerBoard(updatedPlayerBoard);
+
+    if (checkForBingo(updatedPlayerBoard)) {
       setWinner('Player');
       setGamePhase('gameOver');
       return;
@@ -131,8 +133,7 @@ export default function Home() {
   };
   
   const updateBoards = (currentCalled: Set<number>) => {
-    setPlayerBoard(prev => updateBoardMarks(prev, currentCalled));
-    setAiBoard(prev => updateBoardMarks(prev, currentCalled));
+    // This will be handled by specific updates in player/AI moves
   }
   
   useEffect(() => {
@@ -159,44 +160,21 @@ export default function Home() {
     
     const newCalledNumbers = new Set(calledNumbers).add(chosenNumber);
     setCalledNumbers(newCalledNumbers);
-    updateBoards(newCalledNumbers);
     
-    const aiWins = checkForBingo(updateBoardMarks(aiBoard, newCalledNumbers));
-    const playerWins = checkForBingo(updateBoardMarks(playerBoard, newCalledNumbers));
+    const updatedPlayerBoard = updateBoardMarks(playerBoard, newCalledNumbers);
+    const updatedAiBoard = updateBoardMarks(aiBoard, newCalledNumbers);
+    setPlayerBoard(updatedPlayerBoard);
+    setAiBoard(updatedAiBoard);
 
-    if (aiWins) {
+    if (checkForBingo(updatedAiBoard)) {
       setWinner('AI');
       setGamePhase('gameOver');
-    } else if (playerWins) {
+    } else if (checkForBingo(updatedPlayerBoard)) {
       setWinner('Player');
       setGamePhase('gameOver');
     } else {
       setIsPlayerTurn(true);
     }
-  };
-  
-  const renderSetupBoard = () => {
-    return (
-      <div className="grid grid-cols-5 gap-1 md:gap-2 p-1 md:p-2 bg-primary rounded-lg shadow-lg w-full max-w-md aspect-square">
-        {playerBoard.flat().map((cell, index) => {
-          const rowIndex = Math.floor(index / 5);
-          const colIndex = index % 5;
-          return (
-            <button
-              key={index}
-              onClick={() => handleSetupCellClick(rowIndex, colIndex)}
-              className={cn(
-                'flex items-center justify-center aspect-square rounded-md transition-colors duration-200',
-                'text-lg md:text-2xl lg:text-3xl font-bold',
-                cell.number === 0 ? 'bg-card/50 hover:bg-primary/20' : 'bg-card text-card-foreground'
-              )}
-            >
-              {cell.number !== 0 ? cell.number : ''}
-            </button>
-          )
-        })}
-      </div>
-    );
   };
 
   return (
