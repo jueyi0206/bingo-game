@@ -5,7 +5,8 @@ import {
   BingoBoard,
   Board,
   checkForBingo,
-  generateRandomBoard,
+  findBingoLines,
+  BingoLine,
 } from '@/components/bingo-board';
 import { GameControls } from '@/components/game-controls';
 import {
@@ -18,11 +19,9 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import Confetti from 'react-dom-confetti';
-import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { Button } from '@/components/ui/button';
-import { Undo2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { playSound } from '@/lib/sounds';
 
 type GamePhase = 'setup' | 'playing' | 'gameOver';
 
@@ -38,6 +37,8 @@ export default function Home() {
   const [isPlayerTurn, setIsPlayerTurn] = useState(true);
   const [nextSetupNumber, setNextSetupNumber] = useState(1);
   const { toast } = useToast();
+  const [playerBingoLines, setPlayerBingoLines] = useState<BingoLine[]>([]);
+  const [aiBingoLines, setAiBingoLines] = useState<BingoLine[]>([]);
 
   useEffect(() => {
     setIsClient(true);
@@ -53,14 +54,15 @@ export default function Home() {
     setWinner(null);
     setIsPlayerTurn(true);
     setNextSetupNumber(1);
+    setPlayerBingoLines([]);
+    setAiBingoLines([]);
   }, []);
-  
+
   const handleSetupCellClick = (rowIndex: number, colIndex: number) => {
     if (nextSetupNumber > 25) return;
 
     const newBoard = playerBoard.map(row => [...row]);
     
-    // If the cell is already filled, do nothing.
     if (newBoard[rowIndex][colIndex].number !== 0) {
       return;
     }
@@ -101,27 +103,57 @@ export default function Home() {
     setGamePhase('playing');
   };
 
-  const handlePlayerMove = (rowIndex: number, colIndex: number, number: number | 'FREE') => {
-    if (gamePhase !== 'playing' || !isPlayerTurn || typeof number !== 'number' || calledNumbers.has(number)) {
+  const updateGameStatus = (playerB: Board, aiB: Board) => {
+    const playerLines = findBingoLines(playerB);
+    const aiLines = findBingoLines(aiB);
+
+    if (playerLines.length > playerBingoLines.length) {
+      playSound('bell');
+    }
+    if (aiLines.length > aiBingoLines.length) {
+       playSound('bell');
+    }
+
+    setPlayerBingoLines(playerLines);
+    setAiBingoLines(aiLines);
+    
+    if (playerLines.length >= 3) {
+      setWinner('Player');
+      setGamePhase('gameOver');
+      playSound('victory');
+      return true;
+    }
+    if (aiLines.length >= 3) {
+      setWinner('AI');
+      setGamePhase('gameOver');
+      playSound('defeat');
+      return true;
+    }
+    return false;
+  };
+
+  const handlePlayerMove = (rowIndex: number, colIndex: number) => {
+     if (gamePhase !== 'playing' || !isPlayerTurn) return;
+
+    const number = playerBoard[rowIndex][colIndex].number;
+
+    if (typeof number !== 'number' || calledNumbers.has(number)) {
       return;
     }
 
     const newCalledNumbers = new Set(calledNumbers).add(number);
     setCalledNumbers(newCalledNumbers);
-    updateBoards(newCalledNumbers);
 
     const updatedPlayerBoard = updateBoardMarks(playerBoard, newCalledNumbers);
+    const updatedAiBoard = updateBoardMarks(aiBoard, newCalledNumbers);
     setPlayerBoard(updatedPlayerBoard);
+    setAiBoard(updatedAiBoard);
 
-    if (checkForBingo(updatedPlayerBoard)) {
-      setWinner('Player');
-      setGamePhase('gameOver');
-      return;
+    if (!updateGameStatus(updatedPlayerBoard, updatedAiBoard)) {
+       setIsPlayerTurn(false);
     }
-    
-    setIsPlayerTurn(false);
   };
-
+  
   const updateBoardMarks = (board: Board, currentCalled: Set<number>): Board => {
     return board.map(row => 
       row.map(cell => 
@@ -131,10 +163,6 @@ export default function Home() {
       )
     );
   };
-  
-  const updateBoards = (currentCalled: Set<number>) => {
-    // This will be handled by specific updates in player/AI moves
-  }
   
   useEffect(() => {
     if (gamePhase === 'playing' && !isPlayerTurn && !winner) {
@@ -155,6 +183,7 @@ export default function Home() {
 
     if (availableNumbers.length === 0) return;
 
+    // Simple AI: pick a random available number
     const randomIndex = Math.floor(Math.random() * availableNumbers.length);
     const chosenNumber = availableNumbers[randomIndex];
     
@@ -166,16 +195,33 @@ export default function Home() {
     setPlayerBoard(updatedPlayerBoard);
     setAiBoard(updatedAiBoard);
 
-    if (checkForBingo(updatedAiBoard)) {
-      setWinner('AI');
-      setGamePhase('gameOver');
-    } else if (checkForBingo(updatedPlayerBoard)) {
-      setWinner('Player');
-      setGamePhase('gameOver');
-    } else {
-      setIsPlayerTurn(true);
+    if (!updateGameStatus(updatedPlayerBoard, updatedAiBoard)) {
+        setIsPlayerTurn(true);
     }
   };
+
+  const generateRandomBoard = (): Board => {
+    const numbers = Array.from({ length: 25 }, (_, i) => i + 1);
+    const shuffledNumbers = shuffleArray(numbers);
+    const board: Board = Array.from({ length: 5 }, () => []);
+  
+    for (let i = 0; i < 5; i++) {
+      for (let j = 0; j < 5; j++) {
+        board[i][j] = { number: shuffledNumbers[i * 5 + j], marked: false };
+      }
+    }
+    return board;
+  };
+
+  const shuffleArray = (array: any[]) => {
+    // Make a copy to avoid modifying the original array
+    const newArray = [...array];
+    for (let i = newArray.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+    }
+    return newArray;
+  }
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-4 md:p-8 relative overflow-hidden bg-background text-foreground">
@@ -200,32 +246,35 @@ export default function Home() {
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground pt-0">
           <ol className="list-decimal list-inside space-y-1">
-            <li>在「你的棋盤」上點擊格子，依序填入 1 到 25 的數字。</li>
+            <li>在「你的棋盤」上點擊格子，依序填入 1 到 25 的數字。可按「退回」復原。</li>
             <li>填滿後，點擊「開始遊戲」。</li>
-            <li>輪到你時，點擊棋盤上任一數字。雙方棋盤上的該數字會被標記。</li>
-            <li>AI 會在你之後自動選擇一個數字。</li>
-            <li>最先在自己的棋盤上使標記的數字連成一條線（橫、豎或斜線）者獲勝。</li>
+            <li>輪流點擊棋盤上任一未標記的數字。雙方棋盤上的該數字會被標記。</li>
+            <li>每當標記的數字連成一條線（橫、豎或斜線）時，會出現提示。</li>
+            <li>最先在自己的棋盤上連成 **3** 條線者獲勝！</li>
           </ol>
         </CardContent>
       </Card>
 
-
       <div className="flex flex-col lg:flex-row items-start justify-center gap-8 w-full max-w-6xl">
-        {/* Player Board */}
         <div className="flex flex-col items-center gap-4">
-          <h2 className="text-2xl font-bold text-primary">你的棋盤</h2>
+          <h2 className="text-2xl font-bold text-primary">你的棋盤 ({playerBingoLines.length} / 3)</h2>
           <BingoBoard 
             board={playerBoard}
             onCellClick={gamePhase === 'setup' ? handleSetupCellClick : handlePlayerMove}
             disabled={gamePhase === 'playing' && !isPlayerTurn}
             isSetup={gamePhase === 'setup'}
+            bingoLines={playerBingoLines}
           />
         </div>
 
-        {/* AI Board */}
         <div className="flex flex-col items-center gap-4">
-          <h2 className="text-2xl font-bold text-accent">AI 的棋盤</h2>
-          <BingoBoard board={aiBoard} disabled={true} isConcealed={gamePhase === 'setup' || gamePhase === 'playing'} />
+          <h2 className="text-2xl font-bold text-accent">AI 的棋盤 ({aiBingoLines.length} / 3)</h2>
+          <BingoBoard 
+             board={aiBoard} 
+             disabled={true} 
+             isConcealed={gamePhase !== 'gameOver'} 
+             bingoLines={aiBingoLines}
+           />
         </div>
       </div>
 
