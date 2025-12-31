@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   BingoBoard,
   Board,
@@ -17,9 +17,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Button } from '@/components/ui/button';
 import Confetti from 'react-dom-confetti';
-import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 type GamePhase = 'setup' | 'playing' | 'gameOver';
 
@@ -33,6 +33,8 @@ export default function Home() {
   const [winner, setWinner] = useState<'Player' | 'AI' | null>(null);
   const [isClient, setIsClient] = useState(false);
   const [isPlayerTurn, setIsPlayerTurn] = useState(true);
+  const [nextSetupNumber, setNextSetupNumber] = useState(1);
+  const { toast } = useToast();
 
   useEffect(() => {
     setIsClient(true);
@@ -47,22 +49,31 @@ export default function Home() {
     setGamePhase('setup');
     setWinner(null);
     setIsPlayerTurn(true);
+    setNextSetupNumber(1);
   }, []);
   
-  const handleCellChange = (rowIndex: number, colIndex: number, value: string) => {
-    const numberValue = parseInt(value, 10);
-    if (isNaN(numberValue) || numberValue < 1 || numberValue > 25) return;
+  const handleSetupCellClick = (rowIndex: number, colIndex: number) => {
+    if (nextSetupNumber > 25) return;
 
     const newBoard = playerBoard.map(row => [...row]);
-    newBoard[rowIndex][colIndex] = { number: numberValue, marked: false };
+    
+    // If the cell is already filled, do nothing.
+    if (newBoard[rowIndex][colIndex].number !== 0) {
+      return;
+    }
+
+    newBoard[rowIndex][colIndex] = { number: nextSetupNumber, marked: false };
     setPlayerBoard(newBoard);
+    setNextSetupNumber(prev => prev + 1);
   };
 
   const startGame = () => {
-    const allNumbers = playerBoard.flat().map(cell => cell.number);
-    const uniqueNumbers = new Set(allNumbers);
-    if (allNumbers.includes(0) || uniqueNumbers.size !== 25) {
-      alert('請在所有方格中填入 1 到 25 之間不重複的數字。');
+    if (nextSetupNumber <= 25) {
+      toast({
+        variant: "destructive",
+        title: "棋盤尚未完成",
+        description: "請點擊所有方格以填入 1 到 25 的數字。",
+      });
       return;
     }
     setGamePhase('playing');
@@ -141,6 +152,31 @@ export default function Home() {
       setIsPlayerTurn(true);
     }
   };
+  
+  const renderSetupBoard = () => {
+    return (
+      <div className="grid grid-cols-5 gap-1 md:gap-2 p-1 md:p-2 bg-primary rounded-lg shadow-lg w-full max-w-md aspect-square">
+        {playerBoard.flat().map((cell, index) => {
+          const rowIndex = Math.floor(index / 5);
+          const colIndex = index % 5;
+          return (
+            <button
+              key={index}
+              onClick={() => handleSetupCellClick(rowIndex, colIndex)}
+              className={cn(
+                'flex items-center justify-center aspect-square rounded-md transition-colors duration-200',
+                'text-lg md:text-2xl lg:text-3xl font-bold',
+                cell.number === 0 ? 'bg-card/50 hover:bg-primary/20' : 'bg-card text-card-foreground'
+              )}
+            >
+              {cell.number !== 0 ? cell.number : ''}
+            </button>
+          )
+        })}
+      </div>
+    );
+  };
+
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-4 md:p-8 relative overflow-hidden bg-background text-foreground">
@@ -153,7 +189,7 @@ export default function Home() {
           AI 賓果對戰
         </h1>
         <p className="text-muted-foreground mt-2">
-          {gamePhase === 'setup' && '請填入 1-25 的數字開始遊戲。'}
+          {gamePhase === 'setup' && (nextSetupNumber <= 25 ? `請點擊格子填入數字 ${nextSetupNumber}`: '棋盤已完成！')}
           {gamePhase === 'playing' && (isPlayerTurn ? '換你出牌！' : 'AI 思考中...')}
           {gamePhase === 'gameOver' && (winner ? `恭喜 ${winner} 獲勝！` : '遊戲結束！')}
         </p>
@@ -164,22 +200,7 @@ export default function Home() {
         <div className="flex flex-col items-center gap-4">
           <h2 className="text-2xl font-bold text-primary">你的棋盤</h2>
           {gamePhase === 'setup' ? (
-            <div className="grid grid-cols-5 gap-1 p-2 bg-primary rounded-lg shadow-lg">
-              {Array.from({ length: 25 }).map((_, index) => {
-                 const rowIndex = Math.floor(index / 5);
-                 const colIndex = index % 5;
-                return (
-                  <Input
-                    key={index}
-                    type="number"
-                    min="1"
-                    max="25"
-                    className="w-12 h-12 md:w-16 md:h-16 text-center text-lg font-bold bg-card"
-                    onChange={(e) => handleCellChange(rowIndex, colIndex, e.target.value)}
-                  />
-                )
-              })}
-            </div>
+            renderSetupBoard()
           ) : (
             <BingoBoard board={playerBoard} onCellClick={handlePlayerMove} disabled={!isPlayerTurn} />
           )}
