@@ -4,8 +4,8 @@ import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = {
-  title: 'Bingo Blitz',
-  description: 'A 5x5 Bingo game built with Next.js and AI.',
+  title: 'AI 賓果對戰',
+  description: '一個使用 Next.js 和 AI 技術打造的 5x5 賓果對戰遊戲。',
 };
 
 export default function RootLayout({

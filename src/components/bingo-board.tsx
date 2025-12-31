@@ -9,14 +9,6 @@ export type Cell = {
 
 export type Board = Cell[][];
 
-const BINGO_RANGES = {
-  B: { min: 1, max: 15 },
-  I: { min: 16, max: 30 },
-  N: { min: 31, max: 45 },
-  G: { min: 46, max: 60 },
-  O: { min: 61, max: 75 },
-};
-
 function shuffle(array: any[]) {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -25,28 +17,22 @@ function shuffle(array: any[]) {
   return array;
 }
 
-export const generateBingoBoard = (): Board => {
+export const generateRandomBoard = (): Board => {
+  const numbers = Array.from({ length: 25 }, (_, i) => i + 1);
+  const shuffledNumbers = shuffle(numbers);
   const board: Board = Array.from({ length: 5 }, () => []);
-  const columns = ['B', 'I', 'N', 'G', 'O'];
 
-  columns.forEach((col, colIndex) => {
-    const { min, max } = BINGO_RANGES[col as keyof typeof BINGO_RANGES];
-    const numbers = Array.from({ length: max - min + 1 }, (_, i) => i + min);
-    const shuffledNumbers = shuffle(numbers);
-
-    for (let rowIndex = 0; rowIndex < 5; rowIndex++) {
-      if (colIndex === 2 && rowIndex === 2) {
-        board[rowIndex][colIndex] = { number: 'FREE', marked: true };
-      } else {
-        board[rowIndex][colIndex] = { number: shuffledNumbers.pop(), marked: false };
-      }
+  for (let i = 0; i < 5; i++) {
+    for (let j = 0; j < 5; j++) {
+      board[i][j] = { number: shuffledNumbers[i * 5 + j], marked: false };
     }
-  });
-
+  }
   return board;
 };
 
+
 export const checkForBingo = (board: Board): boolean => {
+  if (board.length === 0 || board[0].length === 0) return false;
   // Check rows
   for (let i = 0; i < 5; i++) {
     if (board[i].every((cell) => cell.marked)) return true;
@@ -64,33 +50,45 @@ export const checkForBingo = (board: Board): boolean => {
 
 interface BingoBoardProps {
   board: Board;
-  currentNumber: number | undefined;
+  onCellClick?: (number: number | 'FREE') => void;
+  disabled?: boolean;
 }
 
-export function BingoBoard({ board, currentNumber }: BingoBoardProps) {
-  if (!board.length) {
-    return null;
+export function BingoBoard({ board, onCellClick, disabled = false }: BingoBoardProps) {
+  if (!board.length || !board[0].length || board[0][0].number === 0) {
+    return (
+      <div className="grid grid-cols-5 gap-1 md:gap-2 p-1 md:p-2 bg-primary/50 rounded-lg shadow-inner w-full aspect-square">
+        {Array.from({ length: 25 }).map((_, index) => (
+          <div
+            key={index}
+            className="flex items-center justify-center aspect-square rounded-md bg-card/50"
+          >
+          </div>
+        ))}
+      </div>
+    );
   }
+  
   return (
-    <div className="grid grid-cols-5 gap-1 md:gap-2 p-1 md:p-2 bg-primary rounded-lg shadow-lg w-full aspect-square">
+    <div className="grid grid-cols-5 gap-1 md:gap-2 p-1 md:p-2 bg-primary rounded-lg shadow-lg w-full max-w-md aspect-square">
       {board.flat().map((cell, index) => (
-        <div
+        <button
           key={index}
+          onClick={() => onCellClick && cell.number !== 'FREE' && onCellClick(cell.number)}
+          disabled={disabled || cell.marked}
           className={cn(
             'flex items-center justify-center aspect-square rounded-md transition-all duration-300 transform',
             'text-lg md:text-2xl lg:text-3xl font-bold',
             cell.marked
               ? 'bg-accent text-accent-foreground scale-105 shadow-inner'
               : 'bg-card text-card-foreground',
-            cell.number === currentNumber && 'animate-pop-in'
+            !cell.marked && !disabled && 'hover:bg-primary/20',
+            disabled && 'cursor-not-allowed',
+            cell.marked && disabled && 'cursor-not-allowed'
           )}
         >
-          {cell.number === 'FREE' ? (
-             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8 text-primary"><path d="M12 2L9.75 8.5H2.5L7.5 13.5L5.25 20L12 15.5L18.75 20L16.5 13.5L21.5 8.5H14.25L12 2Z"/></svg>
-          ) : (
-            cell.number
-          )}
-        </div>
+          {cell.number}
+        </button>
       ))}
     </div>
   );
